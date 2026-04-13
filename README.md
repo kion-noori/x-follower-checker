@@ -7,8 +7,6 @@ A Chrome extension that scans your X (Twitter) following list and surfaces accou
 
 No external servers. No API keys. Everything runs locally in your browser using the same session X uses for its own web app.
 
----
-
 ## Features
 
 - Side panel UI — stays open while you browse X
@@ -17,9 +15,11 @@ No external servers. No API keys. Everything runs locally in your browser using 
 - 3 tabs: No Follow-Back / Inactive / All
 - Search by name or @handle
 - Sort by: priority first, most inactive, follower count, A–Z
-- One-click "View" link to open any profile
+- One-click "View" button to open a profile in your current X tab
 
----
+## Current Status
+
+This is a working developer build for manual testing in Chrome. It is not published in the Chrome Web Store yet.
 
 ## Installation (Developer / Unpacked)
 
@@ -33,8 +33,6 @@ No external servers. No API keys. Everything runs locally in your browser using 
 
 > Scanning a large following list (10k+) can take several minutes due to X's rate limits. The extension handles this automatically.
 
----
-
 ## How It Works
 
 The extension uses X's own internal REST API endpoints — the same ones the x.com website calls in your browser. It authenticates using your existing session cookie (`ct0` CSRF token + the web client bearer token embedded in X's public JS bundle). No credentials are ever sent to any third-party server.
@@ -46,19 +44,13 @@ The extension uses X's own internal REST API endpoints — the same ones the x.c
 
 All data stays in your browser. Nothing is stored except a temporary cache in `chrome.storage.local` to hand off results from the content script to the side panel.
 
----
-
 ## Privacy
 
 This extension does not collect, transmit, or store any data outside of your local browser. No analytics, no external requests, no servers. See [PRIVACY.md](PRIVACY.md) for the full policy (required for Chrome Web Store listing).
 
----
-
 ## Chrome Web Store
 
 Not yet published. Planned for a future release.
-
----
 
 ## Development
 
@@ -75,8 +67,6 @@ x-follower-checker/
 ```
 
 To reload changes: go to `chrome://extensions` and click the refresh icon on the extension card.
-
----
 
 ## License
 

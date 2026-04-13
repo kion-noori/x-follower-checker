@@ -327,10 +327,12 @@ function renderCurrentTab() {
     // View link
     const link = document.createElement("a");
     link.className = "action-btn";
-    link.href = `https://x.com/${encodeURIComponent(user.username)}`;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
+    link.href = "#";
     link.textContent = "View";
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      openProfileInCurrentTab(user.username);
+    });
 
     item.appendChild(img);
     item.appendChild(userInfo);
@@ -358,6 +360,25 @@ function showError(msg) {
   }
   errorBox.classList.add("visible");
   errorBox.textContent = "Error: " + msg;
+}
+
+function openProfileInCurrentTab(username) {
+  const profileUrl = `https://x.com/${encodeURIComponent(username)}`;
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs[0];
+
+    if (!activeTab?.id) {
+      window.open(profileUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    chrome.tabs.update(activeTab.id, { url: profileUrl }, () => {
+      if (chrome.runtime.lastError) {
+        window.open(profileUrl, "_blank", "noopener,noreferrer");
+      }
+    });
+  });
 }
 
 function formatCount(n) {
