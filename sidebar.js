@@ -304,16 +304,11 @@ function renderCurrentTab() {
     if (user.isInactive) {
       const b = document.createElement("span");
       b.className = "badge badge-inactive";
-      b.textContent = "Inactive 9mo+";
+      b.textContent = getInactiveBadgeText(user.daysSinceActive);
       badgesDiv.appendChild(b);
     }
 
-    const lastActive =
-      user.daysSinceActive !== null
-        ? user.daysSinceActive >= 365
-          ? `${Math.floor(user.daysSinceActive / 365)}y ${Math.floor((user.daysSinceActive % 365) / 30)}mo ago`
-          : `${Math.floor(user.daysSinceActive / 30)}mo ago`
-        : "Never tweeted";
+    const lastActive = formatLastActive(user.daysSinceActive);
 
     const metaDiv = document.createElement("div");
     metaDiv.className = "user-meta";
@@ -379,6 +374,32 @@ function openProfileInCurrentTab(username) {
       }
     });
   });
+}
+
+function getInactiveBadgeText(daysSinceActive) {
+  if (daysSinceActive === null) {
+    return "Inactive - Never tweeted";
+  }
+
+  return `Inactive - ${formatLastActive(daysSinceActive)}`;
+}
+
+function formatLastActive(daysSinceActive) {
+  if (daysSinceActive === null) {
+    return "Never tweeted";
+  }
+
+  if (daysSinceActive < 30) {
+    return `${daysSinceActive}d ago`;
+  }
+
+  if (daysSinceActive < 365) {
+    return `${Math.floor(daysSinceActive / 30)}mo ago`;
+  }
+
+  const years = Math.floor(daysSinceActive / 365);
+  const months = Math.floor((daysSinceActive % 365) / 30);
+  return months > 0 ? `${years}y ${months}mo ago` : `${years}y ago`;
 }
 
 function formatCount(n) {
