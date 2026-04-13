@@ -17,6 +17,78 @@ function isValidAnalysisData(message) {
   );
 }
 
+function sendMessageToTab(tabId, message) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({
+          ok: false,
+          error: chrome.runtime.lastError.message,
+        });
+        return;
+      }
+
+      resolve({ ok: true, response });
+    });
+  });
+}
+
+function injectContentScript(tabId) {
+  return new Promise((resolve) => {
+    chrome.scripting.executeScript(
+      {
+        target: { tabId },
+        files: ["content.js"],
+      },
+      () => {
+        if (chrome.runtime.lastError) {
+          resolve({
+            ok: false,
+            error: chrome.runtime.lastError.message,
+          });
+          return;
+        }
+
+        resolve({ ok: true });
+      }
+    );
+  });
+}
+
+async function startScanInTab(tabId) {
+  let result = await sendMessageToTab(tabId, { type: "START_SCAN" });
+  if (result.ok) {
+    return result.response || { ok: true };
+  }
+
+  const missingReceiver =
+    result.error &&
+    (result.error.includes("Receiving end does not exist") ||
+      result.error.includes("Could not establish connection"));
+
+  if (!missingReceiver) {
+    return {
+      error: result.error || "Could not contact the X page.",
+    };
+  }
+
+  const injectResult = await injectContentScript(tabId);
+  if (!injectResult.ok) {
+    return {
+      error: `Could not inject scanner into the X tab: ${injectResult.error}`,
+    };
+  }
+
+  result = await sendMessageToTab(tabId, { type: "START_SCAN" });
+  if (result.ok) {
+    return result.response || { ok: true };
+  }
+
+  return {
+    error: result.error || "No response from content script after injection.",
+  };
+}
+
 // ─── Message routing ──────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -52,9 +124,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         (t) => t.url && (t.url.includes("x.com") || t.url.includes("twitter.com"))
       );
       if (xTab) {
-        chrome.tabs.sendMessage(xTab.id, { type: "START_SCAN" }, (response) => {
-          sendResponse(response || { error: "No response from content script" });
-        });
+        startScanInTab(xTab.id)
+          .then((response) => {
+            sendResponse(response);
+          })
+          .catch((error) => {
+            sendResponse({
+              error: error?.message || "Failed to start the scan.",
+            });
+          });
       } else {
         sendResponse({ error: "No X tab found. Please open x.com first." });
       }

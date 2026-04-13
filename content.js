@@ -3,8 +3,14 @@
 // following list, followers list, and last tweet date for each account.
 
 const INACTIVITY_MONTHS = 9;
+const API_BASES = [
+  "https://x.com/i/api/1.1",
+  "https://api.x.com/1.1",
+];
+const BEARER_TOKEN_RE = /(?:Bearer\s+)?(AAAAA[A-Za-z0-9%_-]{20,})/;
 
 let isScanning = false;
+let bearerTokenPromise = null;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -13,17 +19,103 @@ function getCookie(name) {
   return match ? match[2] : null;
 }
 
-function getAuthHeaders() {
+function getTwidUserId() {
+  const twid = getCookie("twid");
+  if (!twid) return null;
+
+  try {
+    const decoded = decodeURIComponent(twid);
+    const match = decoded.match(/u=(\d+)/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractBearerToken(text) {
+  if (!text) return null;
+  const match = text.match(BEARER_TOKEN_RE);
+  return match ? match[1] : null;
+}
+
+async function fetchScriptText(url) {
+  try {
+    const response = await fetch(url, {
+      credentials: "include",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+async function discoverBearerToken() {
+  const inlineScripts = Array.from(document.querySelectorAll("script"))
+    .map((script) => script.textContent || "")
+    .filter(Boolean);
+
+  for (const scriptText of inlineScripts) {
+    const token = extractBearerToken(scriptText);
+    if (token) return token;
+  }
+
+  const currentHtml = await fetchScriptText(window.location.href);
+  const pageToken = extractBearerToken(currentHtml);
+  if (pageToken) return pageToken;
+
+  const assetUrls = new Set(
+    Array.from(document.querySelectorAll("script[src]"))
+      .map((script) => script.src)
+      .filter(Boolean)
+  );
+
+  document
+    .querySelectorAll('link[href][rel="preload"], link[href][rel="modulepreload"]')
+    .forEach((link) => {
+      if (link.href) assetUrls.add(link.href);
+    });
+
+  performance.getEntriesByType("resource").forEach((entry) => {
+    if (entry.name) assetUrls.add(entry.name);
+  });
+
+  const scriptUrls = Array.from(assetUrls)
+    .filter((url) => /\.js($|\?)/.test(url))
+    .filter((url) => /twimg\.com|x\.com|twitter\.com/.test(url));
+
+  for (const url of scriptUrls.slice(0, 30)) {
+    const scriptText = await fetchScriptText(url);
+    const token = extractBearerToken(scriptText);
+    if (token) return token;
+  }
+
+  throw new Error(
+    `Could not find X's web client bearer token in the loaded page assets (${scriptUrls.length} JS assets checked).`
+  );
+}
+
+async function getBearerToken() {
+  const capturedToken = document.documentElement.dataset.xfcBearerToken;
+  if (capturedToken) return capturedToken;
+
+  if (!bearerTokenPromise) {
+    bearerTokenPromise = discoverBearerToken().catch((error) => {
+      bearerTokenPromise = null;
+      throw error;
+    });
+  }
+  return bearerTokenPromise;
+}
+
+async function getAuthHeaders() {
   const csrfToken = getCookie("ct0");
   if (!csrfToken) {
     throw new Error("Not logged in to X. Please log in and try again.");
   }
 
-  // This is X's own web client bearer token — the same one used by x.com itself.
-  // It is not a private credential; it is embedded in X's public JS bundle and
-  // is required to authenticate the same way the website does.
-  const bearerToken =
-    "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I7ssbG44SNs%3DEUifiRBkKG5E2XSoUoDSM0sDd3W2G0Whh4z3GHBEeVmDVJQHOVr";
+  const bearerToken = await getBearerToken();
 
   return {
     authorization: `Bearer ${bearerToken}`,
@@ -35,34 +127,65 @@ function getAuthHeaders() {
   };
 }
 
-async function apiFetch(url, retries = 3) {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const response = await fetch(url, {
-      headers: getAuthHeaders(),
-      credentials: "include",
-      signal: AbortSignal.timeout(20000),
-    });
+function buildApiUrls(pathAndQuery) {
+  return API_BASES.map((base) => `${base}${pathAndQuery}`);
+}
 
-    if (response.status === 429) {
-      const resetHeader = response.headers.get("x-rate-limit-reset");
-      const waitMs = resetHeader
-        ? Math.max(parseInt(resetHeader) * 1000 - Date.now(), 1000)
-        : 60000;
-      sendProgress(0, null, "ratelimit", Math.ceil(waitMs / 1000));
-      await sleep(waitMs);
-      continue;
-    }
+async function apiFetch(pathAndQuery, retries = 3) {
+  let lastError = null;
 
-    if (!response.ok) {
-      throw new Error(`API error ${response.status}: ${response.statusText}`);
-    }
+  for (const url of buildApiUrls(pathAndQuery)) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      const response = await fetch(url, {
+        headers: await getAuthHeaders(),
+        credentials: "include",
+        signal: AbortSignal.timeout(20000),
+      });
 
-    try {
-      return await response.json();
-    } catch {
-      throw new Error("Unexpected response from X API. Please try again.");
+      if (response.status === 429) {
+        const resetHeader = response.headers.get("x-rate-limit-reset");
+        const waitMs = resetHeader
+          ? Math.max(parseInt(resetHeader, 10) * 1000 - Date.now(), 1000)
+          : 60000;
+        sendProgress(0, null, "ratelimit", Math.ceil(waitMs / 1000));
+        await sleep(waitMs);
+        continue;
+      }
+
+      if (!response.ok) {
+        const bodyText = await response.text().catch(() => "");
+        const detail = bodyText
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 180);
+
+        lastError = new Error(
+          `API error ${response.status} on ${new URL(url).hostname}${new URL(url).pathname}${
+            detail ? ` - ${detail}` : ""
+          }`
+        );
+
+        // Some endpoints only exist on one host, and auth behavior can differ
+        // between hosts, so allow fallback for these statuses.
+        if ([401, 403, 404].includes(response.status)) {
+          break;
+        }
+
+        throw lastError;
+      }
+
+      try {
+        return await response.json();
+      } catch {
+        throw new Error("Unexpected response from X API. Please try again.");
+      }
     }
   }
+
+  if (lastError) {
+    throw lastError;
+  }
+
   throw new Error("Too many retries. X may be rate-limiting this request.");
 }
 
@@ -83,6 +206,9 @@ function sendProgress(current, total, stage, extra) {
 // ─── Get current user ID ─────────────────────────────────────────────────────
 
 async function getMyUserId() {
+  const twidUserId = getTwidUserId();
+  if (twidUserId) return twidUserId;
+
   // Try to find the logged-in user's ID from script tags on the page.
   // We look for a pattern close to "id_str" + "screen_name" to avoid
   // matching tweet or other user IDs.
@@ -94,7 +220,7 @@ async function getMyUserId() {
 
   // Fallback: verify_credentials endpoint
   const data = await apiFetch(
-    "https://api.x.com/1.1/account/verify_credentials.json?include_entities=false&skip_status=true&include_email=false"
+    "/account/verify_credentials.json?include_entities=false&skip_status=true&include_email=false"
   );
   if (!data.id_str) throw new Error("Could not determine your user ID. Make sure you are logged in to X.");
   return data.id_str;
@@ -107,7 +233,7 @@ async function fetchFollowing(userId) {
   let cursor = -1;
 
   while (true) {
-    const url = `https://api.x.com/1.1/friends/list.json?user_id=${userId}&count=200&skip_status=false&include_user_entities=false${
+    const url = `/friends/list.json?user_id=${userId}&count=200&skip_status=false&include_user_entities=false${
       cursor !== -1 ? `&cursor=${cursor}` : ""
     }`;
 
@@ -134,12 +260,12 @@ async function fetchFollowers(userId) {
   let cursor = -1;
 
   while (true) {
-    const url = `https://api.x.com/1.1/followers/ids.json?user_id=${userId}&count=5000${
+    const url = `/followers/ids.json?user_id=${userId}&count=5000&stringify_ids=true${
       cursor !== -1 ? `&cursor=${cursor}` : ""
     }`;
 
     const data = await apiFetch(url);
-    const ids = data.ids || [];
+    const ids = data.ids || data.ids_str || [];
     ids.forEach((id) => followers.add(String(id)));
 
     sendProgress(followers.size, null, "followers");
@@ -155,7 +281,7 @@ async function fetchFollowers(userId) {
 // ─── Inactivity check using real calendar months ─────────────────────────────
 
 function isInactive(lastTweetDate) {
-  if (!lastTweetDate) return true;
+  if (!lastTweetDate) return false;
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - INACTIVITY_MONTHS);
   return lastTweetDate < cutoff;

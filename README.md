@@ -4,7 +4,6 @@ A Chrome extension that scans your X (Twitter) following list and surfaces accou
 
 - **Don't follow you back**
 - **Have been inactive for 9+ months**
-- **Both** — the worst offenders, shown first
 
 No external servers. No API keys. Everything runs locally in your browser using the same session X uses for its own web app.
 
@@ -15,9 +14,9 @@ No external servers. No API keys. Everything runs locally in your browser using 
 - Side panel UI — stays open while you browse X
 - Progress bar with live stage labels (fetching following → followers → analyzing)
 - Automatic rate-limit handling — waits and retries if X throttles the request
-- 4 tabs: Both / No Follow-Back / Inactive / All
+- 3 tabs: No Follow-Back / Inactive / All
 - Search by name or @handle
-- Sort by: worst first, most inactive, follower count, A–Z
+- Sort by: priority first, most inactive, follower count, A–Z
 - One-click "View" link to open any profile
 
 ---

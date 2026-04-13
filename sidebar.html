@@ -310,8 +310,6 @@
 
     .badge-no-follow { background: #2d1010; color: var(--danger); }
     .badge-inactive { background: #2d2500; color: var(--warning); }
-    .badge-both { background: #2d1010; color: var(--danger); }
-
     .user-meta {
       font-size: 11px;
       color: var(--text-muted);
@@ -464,7 +462,7 @@
     <ul class="feature-list">
       <li><span>👻</span><span>Not following you back</span></li>
       <li><span>💤</span><span>Inactive for 9+ months</span></li>
-      <li><span>☠️</span><span>Both — worst offenders first</span></li>
+      <li><span>🔎</span><span>Browse everyone in one place</span></li>
     </ul>
     <div class="notice">
       Make sure you are logged in to X in this browser tab, then click <strong>Scan Now</strong>.
@@ -485,10 +483,6 @@
       <div class="stat-value warning" id="statInactive">0</div>
       <div class="stat-label">Inactive 9mo+</div>
     </div>
-    <div class="stat">
-      <div class="stat-value danger" id="statBoth">0</div>
-      <div class="stat-label">Both</div>
-    </div>
   </div>
 
   <!-- Scanned timestamp -->
@@ -496,8 +490,7 @@
 
   <!-- Tabs -->
   <div class="tabs" id="tabs">
-    <div class="tab active" data-tab="both">Both <span class="tab-count" id="countBoth">0</span></div>
-    <div class="tab" data-tab="nofollow">No Follow-Back <span class="tab-count" id="countNoFollow">0</span></div>
+    <div class="tab active" data-tab="nofollow">No Follow-Back <span class="tab-count" id="countNoFollow">0</span></div>
     <div class="tab" data-tab="inactive">Inactive <span class="tab-count" id="countInactive">0</span></div>
     <div class="tab" data-tab="all">All <span class="tab-count" id="countAll">0</span></div>
   </div>
@@ -506,7 +499,7 @@
   <div class="filter-bar" id="filterBar">
     <input class="search-input" id="searchInput" type="text" placeholder="Search by name or @handle..." />
     <select class="sort-select" id="sortSelect">
-      <option value="worst">Worst first</option>
+      <option value="priority">Priority first</option>
       <option value="inactive_days">Most inactive</option>
       <option value="followers_asc">Fewest followers</option>
       <option value="followers_desc">Most followers</option>
@@ -516,8 +509,7 @@
 
   <!-- Tab panels -->
   <div class="tab-panels" id="tabPanels">
-    <div class="tab-panel active" id="panel-both"></div>
-    <div class="tab-panel" id="panel-nofollow"></div>
+    <div class="tab-panel active" id="panel-nofollow"></div>
     <div class="tab-panel" id="panel-inactive"></div>
     <div class="tab-panel" id="panel-all"></div>
   </div>

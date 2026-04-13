@@ -1,9 +1,9 @@
 // Sidebar panel logic
 
 let allResults = [];
-let activeTab = "both";
+let activeTab = "nofollow";
 let searchQuery = "";
-let sortMode = "worst";
+let sortMode = "priority";
 let searchDebounceTimer = null;
 
 // ─── DOM refs ────────────────────────────────────────────────────────────────
@@ -24,9 +24,7 @@ const sortSelect = document.getElementById("sortSelect");
 const statTotal = document.getElementById("statTotal");
 const statNoFollow = document.getElementById("statNoFollow");
 const statInactive = document.getElementById("statInactive");
-const statBoth = document.getElementById("statBoth");
 
-const countBoth = document.getElementById("countBoth");
 const countNoFollow = document.getElementById("countNoFollow");
 const countInactive = document.getElementById("countInactive");
 const countAll = document.getElementById("countAll");
@@ -136,14 +134,11 @@ function renderAll(ts) {
   // Update stats
   const noFollow = allResults.filter((u) => !u.followsBack);
   const inactive = allResults.filter((u) => u.isInactive);
-  const both = allResults.filter((u) => !u.followsBack && u.isInactive);
 
   statTotal.textContent = allResults.length;
   statNoFollow.textContent = noFollow.length;
   statInactive.textContent = inactive.length;
-  statBoth.textContent = both.length;
 
-  countBoth.textContent = both.length;
   countNoFollow.textContent = noFollow.length;
   countInactive.textContent = inactive.length;
   countAll.textContent = allResults.length;
@@ -194,8 +189,6 @@ sortSelect.addEventListener("change", () => {
 
 function getTabData() {
   switch (activeTab) {
-    case "both":
-      return allResults.filter((u) => !u.followsBack && u.isInactive);
     case "nofollow":
       return allResults.filter((u) => !u.followsBack);
     case "inactive":
@@ -218,7 +211,7 @@ function applySearchAndSort(data) {
 
   // Sort
   switch (sortMode) {
-    case "worst":
+    case "priority":
       data = data.sort((a, b) => {
         const scoreA = (!a.followsBack ? 2 : 0) + (a.isInactive ? 1 : 0);
         const scoreB = (!b.followsBack ? 2 : 0) + (b.isInactive ? 1 : 0);
@@ -253,15 +246,15 @@ function renderCurrentTab() {
   if (data.length === 0) {
     panel.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">${activeTab === "both" ? "🎉" : "🔍"}</div>
+        <div class="empty-state-icon">${activeTab === "all" ? "👋" : "🔍"}</div>
         <h3>${
-          activeTab === "both" && !searchQuery
-            ? "All clear!"
+          activeTab === "all" && !searchQuery
+            ? "Nothing here yet"
             : "No results"
         }</h3>
         <p>${
-          activeTab === "both" && !searchQuery
-            ? "No one is both inactive AND not following you back."
+          activeTab === "all" && !searchQuery
+            ? "Run a scan to start reviewing your following list."
             : searchQuery
             ? "No accounts match your search."
             : "Nothing to show in this category."
@@ -302,25 +295,17 @@ function renderCurrentTab() {
     // Badges
     const badgesDiv = document.createElement("div");
     badgesDiv.className = "badges";
-    const isBoth = !user.followsBack && user.isInactive;
-    if (isBoth) {
+    if (!user.followsBack) {
       const b = document.createElement("span");
-      b.className = "badge badge-both";
-      b.textContent = "No follow-back + Inactive";
+      b.className = "badge badge-no-follow";
+      b.textContent = "No follow-back";
       badgesDiv.appendChild(b);
-    } else {
-      if (!user.followsBack) {
-        const b = document.createElement("span");
-        b.className = "badge badge-no-follow";
-        b.textContent = "No follow-back";
-        badgesDiv.appendChild(b);
-      }
-      if (user.isInactive) {
-        const b = document.createElement("span");
-        b.className = "badge badge-inactive";
-        b.textContent = "Inactive 9mo+";
-        badgesDiv.appendChild(b);
-      }
+    }
+    if (user.isInactive) {
+      const b = document.createElement("span");
+      b.className = "badge badge-inactive";
+      b.textContent = "Inactive 9mo+";
+      badgesDiv.appendChild(b);
     }
 
     const lastActive =

@@ -6,10 +6,13 @@
   "homepage_url": "https://github.com/kionnoori/x-follower-checker",
   "permissions": [
     "sidePanel",
+    "scripting",
     "storage",
     "tabs"
   ],
   "host_permissions": [
+    "https://api.x.com/*",
+    "https://*.twimg.com/*",
     "https://x.com/*",
     "https://twitter.com/*"
   ],
@@ -19,8 +22,14 @@
   "content_scripts": [
     {
       "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["page-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "side_panel": {
