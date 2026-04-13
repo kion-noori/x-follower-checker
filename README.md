@@ -21,6 +21,8 @@ No external servers. No API keys. Everything runs locally in your browser using 
 
 This is a working developer build for manual testing in Chrome. It is not published in the Chrome Web Store yet.
 
+For the latest handoff notes, current behavior, and next steps, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
+
 ## Installation (Developer / Unpacked)
 
 1. Clone or download this repo
@@ -67,6 +69,13 @@ x-follower-checker/
 ```
 
 To reload changes: go to `chrome://extensions` and click the refresh icon on the extension card.
+
+### Notes
+
+- The UI currently focuses on two primary signals: `No Follow-Back` and `Inactive`.
+- The older combined `Both` category was intentionally removed after manual testing surfaced confusing false positives.
+- The `View` button reuses the current active X tab instead of opening a new tab.
+- Inactive badges show the actual inactivity duration when that data is available.
 
 ## License
 
